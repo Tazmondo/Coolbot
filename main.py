@@ -18,7 +18,7 @@ class BotSettings:
     def __init__(self, args):
         x = args[:]
         args = []
-        default = [2, True, "]", 23, 5]
+        default = [2, True, "]", 0, 0]
 
         for i in range(0, len(default)):
             if i < len(x):
