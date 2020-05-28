@@ -33,7 +33,15 @@ class BotSettings:
 
 
 class BotGuild:
-    def __init__(self, iid, isettings, ileaderboard, ilbdisplay, ileaderboardmsg, isettingsmsg, iobject):
+    def __init__(self, iid: int,
+                 isettings: BotSettings,
+                 ileaderboard: dict,
+                 ilbdisplay: discord.Message,
+                 ileaderboardmsg: discord.Message,
+                 isettingsmsg: discord.Message,
+                 iobject: discord.Guild
+                 ):
+
         self.ac = None
         self.id = iid
         self.settings = isettings
@@ -476,6 +484,19 @@ class MyClient(discord.Client):
     async def on_guild_join(self, guild: discord.Guild):
         myguild = self.get_guild(myserverid)
         await setupguild(guild, myguild)
+
+    async def on_guild_remove(self, guild: discord.Guild):
+        gid = guild.id
+        guildclass = guilds[gid]
+
+        if guildclass.ac is not None:
+            guildclass.ac.cancel()
+        if guildclass.auto is not None:
+            guildclass.auto.cancel()
+
+        await guildclass.lbsave.channel.delete()
+        await guildclass.lbsettingsmessage.channel.delete()
+        del guilds[gid]
 
 
 client = MyClient()
