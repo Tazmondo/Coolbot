@@ -497,7 +497,7 @@ class MyClient(discord.Client):
             guildclass.auto.cancel()
 
         await guildclass.lbsave.channel.delete()
-        await guildclass.lbsettingsmessage.channel.delete()
+        await guildclass.settingsmessage.channel.delete()
         del guilds[gid]
 
 
