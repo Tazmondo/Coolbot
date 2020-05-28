@@ -319,8 +319,11 @@ async def leaderboard(message: discord.Message):
 async def autoupdateleaderboard(guild: BotGuild):
     while True:
         print("updating {}".format(guild.object.name))
-        await guild.lbdisplay.edit(content=generateleaderboard(guild.object))
-        await guild.lbsave.edit(content=json.dumps(guild.leaderboard))
+        try:
+            await guild.lbdisplay.edit(content=generateleaderboard(guild.object))
+            await guild.lbsave.edit(content=json.dumps(guild.leaderboard))
+        except Exception as e:
+            print(f"Exception occured while updating {guild.object.name}: {e}")
         await asyncio.sleep(15)
 
 
