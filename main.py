@@ -1,8 +1,8 @@
-import discord
-import logging
 import asyncio
 import json
+import logging
 from datetime import datetime, time
+import discord
 
 logging.basicConfig(level=logging.INFO)
 
@@ -97,8 +97,11 @@ async def watchserver(guild: discord.Guild):  # Automatically adds coolpoints to
         # Checks if the time is between the start and end.
         if timebetween(time(csettings.starttime), time(csettings.endtime), datetime.now().time()):
             for vc in guild.voice_channels:
-                if len(vc.members) >= csettings.minforcount:
-                    for member in vc.members:
+                vcmembers = vc.members
+                vcmembers = list(filter(lambda a: not a.bot, vcmembers))  # Remove bots from memberlist
+
+                if len(vcmembers) >= csettings.minforcount:
+                    for member in vcmembers:
                         vs = member.voice
                         if vs.deaf or vs.self_deaf:
                             print("{} is deaf in {}.".format(member.name, guild.name))
@@ -278,7 +281,7 @@ async def bothelp(message: discord.Message):
     "{}reset\nCompletely resets the leaderboard."
                         .format(csettings.prefix))
 
-    helpembed.add_field(name="***ping***", value=
+    helpembed.add_field(name="***ping*** - Anybody", value=
     "{}ping\nPong!"
                         .format(csettings.prefix))
 
@@ -441,10 +444,11 @@ async def setupguild(guild: discord.Guild, myguild: discord.Guild):
             manage_webhooks=True,
         )
         try:
-            lbdisplay = await guild.create_text_channel('coolbot-leaderboard', overwrites={
-                guild.default_role: permissions,
-                client.user: meperms
-            })
+            lbdisplay = await guild.create_text_channel('coolbot-leaderboard', topic="DO NOT SEND ANY MESSAGES TO THIS CHANNEL OR THE BOT WON'T BE ABLE TO UPDATE YOUR SERVER'S LEADERBOARD.",
+                                                        overwrites={
+                                                        guild.default_role: permissions,
+                                                        client.user: meperms
+                                                    })
         except discord.Forbidden:
             await guild.owner.send(content="Please reinvite the bot with permissions to create channels.")
             await guild.leave()
@@ -480,6 +484,8 @@ class MyClient(discord.Client):
             return
 
         if message.content.startswith(guilds[message.guild.id].settings.prefix):
+            print(f"Command used in server {message.guild.name}, in channel {message.channel.name}.\n"
+                  f"Command: {message.content}")
             params = message.content[1:].split(" ")
             asyncio.create_task(commands[params[0]](message))
 
