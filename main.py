@@ -13,6 +13,9 @@ bottoken = botparameters['token']
 guilds = {}
 myid = botparameters['myid']
 myserverid = botparameters['myserverid']
+botclientid = botparameters['botclientid']
+validpermissions = discord.Permissions(201850064)
+
 
 class BotSettings:
     def __init__(self, args):
@@ -300,7 +303,7 @@ def generateleaderboard(guild: discord.Guild):
 
 
 async def leaderboard(message: discord.Message):
-    boardoutput = generateleaderboard(message)
+    boardoutput = generateleaderboard(message.guild)
     await message.channel.send(content=boardoutput)
     return True
 
@@ -348,6 +351,11 @@ async def executecode(message: discord.Message):
     await message.channel.send(content="Code executed.")
 
 
+async def invitecmd(message: discord.Message):
+    invitelink = discord.utils.oauth_url(botclientid, validpermissions)
+    await message.channel.send(f"Invite generated:\n{invitelink}")
+
+
 commands = {
     'ping': ping,
     'settings': settings,
@@ -356,7 +364,96 @@ commands = {
     'set': setdata,
     'reset': resetlb,
     'execute': executecode,
+    'invite': invitecmd,
 }
+
+
+async def setupguild(guild: discord.Guild, myguild: discord.Guild):
+    settingschannel = None
+    lbchannel = None
+    lbsavechannel = None
+    lbinput = {}
+    for channel in myguild.text_channels:
+        if channel.name == str(guild.id) + "s":
+            settingschannel = channel
+        if channel.name == str(guild.id) + "l":
+            lbsavechannel = channel
+    for channel in guild.text_channels:
+        if channel.name == "coolbot-leaderboard":
+            lbchannel = channel
+    if settingschannel is None:
+        settingschannel = await myguild.create_text_channel(str(guild.id) + "s")
+        settingsmessage = await settingschannel.send(content="{}")
+        await settingsmessage.edit(content=json.dumps(BotSettings([]).__dict__))
+        settingsdict = json.loads(settingsmessage.content)
+    else:
+        settingsmessage = await settingschannel.fetch_message(settingschannel.last_message_id)
+        settingsdict = json.loads(settingsmessage.content)
+
+    if lbsavechannel is None:
+        lbsavechannel = await myguild.create_text_channel(str(guild.id) + "l")
+        lbsavemsg = await lbsavechannel.send(content="{}")
+    else:
+        lbsavemsg = await lbsavechannel.fetch_message(lbsavechannel.last_message_id)
+        lbbadinput = json.loads(lbsavemsg.content)
+        lbinput = {}
+        for item in lbbadinput.items():
+            lbinput[int(item[0])] = item[1]
+
+        print(lbinput)
+    if lbchannel is None:
+        permissions = discord.PermissionOverwrite(
+            create_instant_invite=False,
+            manage_channels=False,
+            read_messages=True,
+            send_messages=False,
+            send_tts_messages=False,
+            manage_messages=False,
+            embed_links=False,
+            read_message_history=True,
+            mention_everyone=False,
+            attach_files=False,
+            manage_roles=False,
+            manage_webhooks=False
+        )
+        meperms = discord.PermissionOverwrite(
+            create_instant_invite=True,
+            manage_channels=True,
+            read_messages=True,
+            send_messages=True,
+            send_tts_messages=True,
+            manage_messages=True,
+            embed_links=True,
+            read_message_history=True,
+            mention_everyone=True,
+            attach_files=True,
+            manage_roles=True,
+            manage_webhooks=True,
+        )
+        try:
+            lbdisplay = await guild.create_text_channel('coolbot-leaderboard', overwrites={
+                guild.default_role: permissions,
+                client.user: meperms
+            })
+        except discord.Forbidden:
+            await guild.owner.send(content="Please reinvite the bot with permissions to create channels.")
+            await guild.leave()
+            return True
+
+        lbdisplaymsg = await lbdisplay.send(content="Initalising leaderboard. Please wait.")
+    else:
+        lbdisplaymsg = await lbchannel.fetch_message(lbchannel.last_message_id)
+
+    settingvalues = list(settingsdict.values())
+    print(settingvalues)
+    newguild = BotGuild(guild.id, BotSettings(settingvalues), lbinput, lbdisplaymsg, lbsavemsg, settingsmessage,
+                        guild)
+
+    asyncio.create_task(autoupdateleaderboard(newguild))
+    watcher = asyncio.create_task(watchserver(guild))
+    newguild.auto = watcher
+
+    guilds[guild.id] = newguild
 
 
 class MyClient(discord.Client):
@@ -364,95 +461,21 @@ class MyClient(discord.Client):
         print('Logged on as {0}!'.format(self.user))
         myguild = self.get_guild(myserverid)
         for guild in client.guilds:
-            settingschannel = None
-            lbchannel = None
-            lbsavechannel = None
-            lbinput = {}
-            for channel in myguild.text_channels:
-                if channel.name == str(guild.id) + "s":
-                    settingschannel = channel
-                if channel.name == str(guild.id) + "l":
-                    lbsavechannel = channel
-            for channel in guild.text_channels:
-                if channel.name == "coolbot-leaderboard":
-                    lbchannel = channel
-            if settingschannel is None:
-                settingschannel = await myguild.create_text_channel(str(guild.id) + "s")
-                settingsmessage = await settingschannel.send(content="Initialising server.")
-                await settingsmessage.edit(content=json.dumps(BotSettings([]).__dict__))
-                settingsdict = json.loads(settingsmessage.content)
-            else:
-                settingsmessage = await settingschannel.fetch_message(settingschannel.last_message_id)
-                settingsdict = json.loads(settingsmessage.content)
-
-            if lbsavechannel is None:
-                lbsavechannel = await myguild.create_text_channel(str(guild.id) + "l")
-                lbsavemsg = await lbsavechannel.send(content="Initialising leaderboard.")
-            else:
-                lbsavemsg = await lbsavechannel.fetch_message(lbsavechannel.last_message_id)
-                lbbadinput = json.loads(lbsavemsg.content)
-                lbinput = {}
-                for item in lbbadinput.items():
-                    lbinput[int(item[0])] = item[1]
-
-                print(lbinput)
-            if lbchannel is None:
-                permissions = discord.PermissionOverwrite(
-                    create_instant_invite=False,
-                    manage_channels=False,
-                    read_messages=True,
-                    send_messages=False,
-                    send_tts_messages=False,
-                    manage_messages=False,
-                    embed_links=False,
-                    read_message_history=True,
-                    mention_everyone=False,
-                    attach_files=False,
-                    manage_roles=False,
-                    manage_webhooks=False
-                )
-                meperms = discord.PermissionOverwrite(
-                    create_instant_invite=True,
-                    manage_channels=True,
-                    read_messages=True,
-                    send_messages=True,
-                    send_tts_messages=True,
-                    manage_messages=True,
-                    embed_links=True,
-                    read_message_history=True,
-                    mention_everyone=True,
-                    attach_files=True,
-                    manage_roles=True,
-                    manage_webhooks=True,
-                )
-                lbdisplay = await guild.create_text_channel('coolbot-leaderboard', overwrites={
-                    guild.default_role: permissions,
-                    self.user: meperms
-                })
-                lbdisplaymsg = await lbdisplay.send(content="Initalising leaderboard. Please wait.")
-            else:
-                lbdisplaymsg = await lbchannel.fetch_message(lbchannel.last_message_id)
-
-            settingvalues = list(settingsdict.values())
-            print(settingvalues)
-            newguild = BotGuild(guild.id, BotSettings(settingvalues), lbinput, lbdisplaymsg, lbsavemsg, settingsmessage,
-                                guild)
-
-            asyncio.create_task(autoupdateleaderboard(newguild))
-            watcher = asyncio.create_task(watchserver(guild))
-            newguild.auto = watcher
-
-            guilds[guild.id] = newguild
+            await setupguild(guild, myguild)
 
         print("Prepared.")
 
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.author == self.user:
             return
 
         if message.content.startswith(guilds[message.guild.id].settings.prefix):
             params = message.content[1:].split(" ")
             asyncio.create_task(commands[params[0]](message))
+
+    async def on_guild_join(self, guild: discord.Guild):
+        myguild = self.get_guild(myserverid)
+        await setupguild(guild, myguild)
 
 
 client = MyClient()
