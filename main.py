@@ -88,6 +88,14 @@ async def ping(message: discord.Message):  # Simple test command
     return True
 
 
+def filteroutbotanddeafen(list):
+    newlist = []
+    for x in list:
+        if not x.bot and not x.voice.deaf and not x.voice.self_deaf:
+            newlist.append(x)
+    return newlist
+
+
 async def watchserver(guild: discord.Guild):  # Automatically adds coolpoints to people in voice chat in different
     cguild = guilds[guild.id]                 # servers.
     csettings = cguild.settings
@@ -98,7 +106,7 @@ async def watchserver(guild: discord.Guild):  # Automatically adds coolpoints to
         if timebetween(time(csettings.starttime), time(csettings.endtime), datetime.now().time()):
             for vc in guild.voice_channels:
                 vcmembers = vc.members
-                vcmembers = list(filter(lambda a: not a.bot, vcmembers))  # Remove bots from memberlist
+                vcmembers = filteroutbotanddeafen(vcmembers)  # Remove bots from memberlist
 
                 if len(vcmembers) >= csettings.minforcount:
                     for member in vcmembers:
