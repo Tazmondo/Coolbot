@@ -107,10 +107,6 @@ async def watchserver(guild: discord.Guild):  # Automatically adds coolpoints to
 
                 if len(vcmembers) >= csettings.minforcount:
                     for member in vcmembers:
-                        vs = member.voice
-                        if vs.deaf or vs.self_deaf:
-                            print("{} is deaf in {}.".format(member.name, guild.name))
-                            continue
                         print("Doing {} in {}.".format(member.name, guild.name))
                         if member.id not in cguild.leaderboarddict:
                             cguild.leaderboarddict[member.id] = 1
