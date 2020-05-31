@@ -21,15 +21,13 @@ class BotSettings:
     def __init__(self, args):
         x = args[:]
         args = []
-        default = [2, True, "]", 0, 0]
-
+        default = [2, True, "]", 0, 0, 0]
         for i in range(0, len(default)):
             if i < len(x):
                 args.append(x[i])
             else:
                 args.append(default[i])
-
-        self.minforcount, self.iscounting, self.prefix, self.starttime, self.endtime = args
+        self.minforcount, self.iscounting, self.prefix, self.starttime, self.endtime, self.lbchannelid = args
 
 
 class BotGuild:
@@ -41,14 +39,13 @@ class BotGuild:
                  isettingsmsg: discord.Message,
                  iobject: discord.Guild
                  ):
-
         self.ac = None
         self.id = iid
         self.settings = isettings
         self.auto = None
-        self.leaderboard = ileaderboard
-        self.lbdisplay = ilbdisplay
-        self.lbsave = ileaderboardmsg
+        self.leaderboarddict = ileaderboard
+        self.lbdisplaymessage = ilbdisplay
+        self.lbsavemessage = ileaderboardmsg
         self.settingsmessage = isettingsmsg
         self.object = iobject
 
@@ -88,16 +85,16 @@ async def ping(message: discord.Message):  # Simple test command
     return True
 
 
-def filteroutbotanddeafen(list):
+def filteroutbotanddeafen(ilist):
     newlist = []
-    for x in list:
+    for x in ilist:
         if not x.bot and not x.voice.deaf and not x.voice.self_deaf:
             newlist.append(x)
     return newlist
 
 
 async def watchserver(guild: discord.Guild):  # Automatically adds coolpoints to people in voice chat in different
-    cguild = guilds[guild.id]                 # servers.
+    cguild = guilds[guild.id]  # servers.
     csettings = cguild.settings
 
     while csettings.iscounting:
@@ -115,10 +112,10 @@ async def watchserver(guild: discord.Guild):  # Automatically adds coolpoints to
                             print("{} is deaf in {}.".format(member.name, guild.name))
                             continue
                         print("Doing {} in {}.".format(member.name, guild.name))
-                        if member.id not in cguild.leaderboard:
-                            cguild.leaderboard[member.id] = 1
+                        if member.id not in cguild.leaderboarddict:
+                            cguild.leaderboarddict[member.id] = 1
                         else:
-                            cguild.leaderboard[member.id] += 1
+                            cguild.leaderboarddict[member.id] += 1
 
 
 # async def recordchannel(channel, message: discord.Message):
@@ -230,7 +227,7 @@ async def settings(message: discord.Message):
                                        .format(params[2]))
     elif params[1] == "settime":
         if len(params) != 4:
-            await message.channel.send(content="Please check help to see how to do this command.")
+            await message.channel.send(content=errmsg)
         else:
             csettings.starttime = int(params[2])
             csettings.endtime = int(params[3])
@@ -278,7 +275,7 @@ async def bothelp(message: discord.Message):
 
     helpembed.add_field(name="***leaderboard*** - Anybody", value=
     "{}leaderboard\nDisplays the leaderboard. It can also be found here: <#{}>"
-                        .format(csettings.prefix, cguild.lbdisplay.channel.id))
+                        .format(csettings.prefix, cguild.lbdisplaymessage.channel.id))
 
     helpembed.add_field(name="***set*** - Owner", value=
     "{}set [discord id] [point value]\nSets the points of the target to the given value. Note that it is discord id, "
@@ -301,7 +298,7 @@ def generateleaderboard(guild: discord.Guild):
     if isinstance(guild, discord.Message):
         guild = guild.guild
     cguild = guilds[guild.id]
-    cleaderboard = cguild.leaderboard
+    cleaderboard = cguild.leaderboarddict
     sortedleaderboard = reversed(sorted([item for item in cleaderboard.items()], key=lambda n: n[1]))
     leaderboardnames = []
     for x in sortedleaderboard:
@@ -329,12 +326,17 @@ async def leaderboard(message: discord.Message):
 async def autoupdateleaderboard(guild: BotGuild):
     while True:
         print("updating {}".format(guild.object.name))
-        try:
-            await guild.lbdisplay.edit(content=generateleaderboard(guild.object))
-            await guild.lbsave.edit(content=json.dumps(guild.leaderboard))
-        except Exception as e:
-            print(f"Exception occured while updating {guild.object.name}: {e}")
-        await asyncio.sleep(15)
+        jsonlb = json.dumps(guild.leaderboarddict)
+
+        if jsonlb != guild.lbsavemessage.content or guild.lbdisplaymessage.content == "Initalising leaderboard. Please wait.":
+            try:
+                await guild.lbdisplaymessage.edit(content=generateleaderboard(guild.object))
+                await guild.lbsavemessage.edit(content=jsonlb)
+            except Exception as e:
+                print(f"Exception occured while updating {guild.object.name}: {e}")
+        else:
+            print(f'{guild.object.name} did not need updating.')
+        await asyncio.sleep(20)
 
 
 async def setdata(message: discord.Message):
@@ -347,7 +349,7 @@ async def setdata(message: discord.Message):
         return True
     if params[1].isdecimal() and params[2].isdecimal():
         cguild = guilds[message.guild.id]
-        cguild.leaderboard[int(params[1])] = int(params[2])
+        cguild.leaderboarddict[int(params[1])] = int(params[2])
         await message.channel.send("Successfully set {}'s points to {}."
                                    .format(cguild.object.get_member(int(params[1])).name, params[2]))
     else:
@@ -359,7 +361,7 @@ async def resetlb(message: discord.Message):
     if not validate(message, Security.OWNER):
         await message.channel.send(content=Security.invalid)
         return True
-    guilds[message.guild.id].leaderboard = {}
+    guilds[message.guild.id].leaderboarddict = {}
     await message.channel.send(content="Successfully reset leaderboard.")
 
 
@@ -391,17 +393,16 @@ commands = {
 
 async def setupguild(guild: discord.Guild, myguild: discord.Guild):
     settingschannel = None
-    lbchannel = None
+    lbdisplay = None
     lbsavechannel = None
     lbinput = {}
+
     for channel in myguild.text_channels:
         if channel.name == str(guild.id) + "s":
             settingschannel = channel
         if channel.name == str(guild.id) + "l":
             lbsavechannel = channel
-    for channel in guild.text_channels:
-        if channel.name == "coolbot-leaderboard":
-            lbchannel = channel
+
     if settingschannel is None:
         settingschannel = await myguild.create_text_channel(str(guild.id) + "s")
         settingsmessage = await settingschannel.send(content="{}")
@@ -410,6 +411,8 @@ async def setupguild(guild: discord.Guild, myguild: discord.Guild):
     else:
         settingsmessage = await settingschannel.fetch_message(settingschannel.last_message_id)
         settingsdict = json.loads(settingsmessage.content)
+
+    guildsettings = BotSettings(list(settingsdict.values()))
 
     if lbsavechannel is None:
         lbsavechannel = await myguild.create_text_channel(str(guild.id) + "l")
@@ -421,8 +424,7 @@ async def setupguild(guild: discord.Guild, myguild: discord.Guild):
         for item in lbbadinput.items():
             lbinput[int(item[0])] = item[1]
 
-        print(lbinput)
-    if lbchannel is None:
+    if guildsettings.lbchannelid == 0:
         permissions = discord.PermissionOverwrite(
             create_instant_invite=False,
             manage_channels=False,
@@ -452,11 +454,14 @@ async def setupguild(guild: discord.Guild, myguild: discord.Guild):
             manage_webhooks=True,
         )
         try:
-            lbdisplay = await guild.create_text_channel('coolbot-leaderboard', topic="DO NOT SEND ANY MESSAGES TO THIS CHANNEL OR THE BOT WON'T BE ABLE TO UPDATE YOUR SERVER'S LEADERBOARD.",
+            lbdisplay = await guild.create_text_channel('coolbot-leaderboard', topic=
+            "DO NOT SEND ANY MESSAGES TO THIS CHANNEL OR THE BOT WON'T BE ABLE TO UPDATE YOUR SERVER'S LEADERBOARD. "
+            "This channel can be renamed.",
                                                         overwrites={
-                                                        guild.default_role: permissions,
-                                                        client.user: meperms
-                                                    })
+                                                            guild.default_role: permissions,
+                                                            client.user: meperms
+                                                        })
+            guildsettings.lbchannelid = lbdisplay.id
         except discord.Forbidden:
             await guild.owner.send(content="Please reinvite the bot with permissions to create channels.")
             await guild.leave()
@@ -464,12 +469,14 @@ async def setupguild(guild: discord.Guild, myguild: discord.Guild):
 
         lbdisplaymsg = await lbdisplay.send(content="Initalising leaderboard. Please wait.")
     else:
-        lbdisplaymsg = await lbchannel.fetch_message(lbchannel.last_message_id)
+        lbdisplay = guild.get_channel(guildsettings.lbchannelid)
+        lbdisplaymsg = await lbdisplay.fetch_message(lbdisplay.last_message_id)
+        if lbdisplaymsg.author != guild.me:
+            lbdisplaymsg = await lbdisplay.send(content="Initalising leaderboard. Please wait.")
 
-    settingvalues = list(settingsdict.values())
-    print(settingvalues)
-    newguild = BotGuild(guild.id, BotSettings(settingvalues), lbinput, lbdisplaymsg, lbsavemsg, settingsmessage,
+    newguild = BotGuild(guild.id, guildsettings, lbinput, lbdisplaymsg, lbsavemsg, settingsmessage,
                         guild)
+    await updatesettings(newguild)
 
     asyncio.create_task(autoupdateleaderboard(newguild))
     watcher = asyncio.create_task(watchserver(guild))
@@ -510,7 +517,7 @@ class MyClient(discord.Client):
         if guildclass.auto is not None:
             guildclass.auto.cancel()
 
-        await guildclass.lbsave.channel.delete()
+        await guildclass.lbsavemessage.channel.delete()
         await guildclass.settingsmessage.channel.delete()
         del guilds[gid]
 
