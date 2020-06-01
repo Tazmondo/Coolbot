@@ -262,11 +262,7 @@ async def leaderboard(message: discord.Message):
 
 async def autoupdateleaderboard(guild: BotGuild):
     while True:
-        print("updating {}".format(guild.object.name))
         jsonlb = json.dumps(guild.leaderboarddict)
-        print(jsonlb)
-        print("-----------")
-        print(guild.lbsavemessage.content)
 
         if jsonlb != guild.lbsavemessage.content or guild.lbdisplaymessage.content == "Initalising leaderboard. Please wait.":
             try:
