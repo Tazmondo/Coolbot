@@ -266,10 +266,8 @@ async def autoupdateleaderboard(guild: BotGuild):
 
         if jsonlb != guild.lbsavemessage.content or guild.lbdisplaymessage.content == "Initalising leaderboard. Please wait.":
             try:
-                print("L")
                 await guild.lbdisplaymessage.edit(content=generateleaderboard(guild.object))
                 await guild.lbsavemessage.edit(content=jsonlb)
-                print("W")
             except Exception as e:
                 print(f"Exception occured while updating {guild.object.name}: {e}")
         else:
