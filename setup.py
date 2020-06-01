@@ -114,66 +114,6 @@ async def watchserver(guild: discord.Guild):  # Automatically adds coolpoints to
                             cguild.leaderboarddict[member.id] += 1
 
 
-# async def recordchannel(channel, message: discord.Message):
-#     # Manually scans a channel.
-#     cguildid = message.guild.id
-#     cguild = guilds[cguildid]
-#     while len(channel.members) >= cguild.settings.minforcount:  # Checks if enough people
-#         for member in channel.members:
-#             memid = member.id
-#             if memid not in cguild.leaderboard:
-#                 cguildid.leaderboard[memid] = 1
-#             else:
-#                 cguild.leaderboard[memid] += 1
-#         await asyncio.sleep(1)
-#
-#     else:
-#         await message.channel.send(content='Not enough people in call. Stopping counting.')
-#         guilds[cguildid].ac = None
-
-
-# async def manualchannel(message: discord.Message):
-#     if not validate(message, Security.ADMIN):
-#         await message.channel.send(content=Security.invalid)
-#         return True
-#     member = message.author
-#     voicestate = member.voice
-#     if voicestate is None:
-#         await message.channel.send(content="You are not currently in a voice channel.\nPlease join the voice channel "
-#                                            "you would like me to watch.")
-#         return True
-#
-#     vc = voicestate.channel
-#     curguild = guilds[message.guild.id]
-#     if curguild.ac is None:
-#         watch = asyncio.create_task(recordchannel(vc, message))
-#         await message.channel.send(content="Started watching channel **{}**."
-#                                    .format(message.channel.name))
-#     else:
-#         await message.channel.send(content="Already watching **{}**. Switching to **{}**."
-#                                    .format(curguild.ac[0].name, vc.name))
-#         curguild.ac[1].cancel()
-#         watch = asyncio.create_task(recordchannel(vc, message))
-#     curguild.ac = [vc, watch]
-#     return True
-
-
-# async def stopwatching(message: discord.Message):
-#     if not validate(message, Security.ADMIN):
-#         await message.channel.send(content=Security.invalid)
-#         return True
-#     curguild = guilds[message.guild.id]
-#     if curguild.ac is None:
-#         await message.channel.send(content="I'm not manually watching a channel. Automatic mode is **{}**."
-#                                    .format(curguild.settings.iscounting))
-#     else:
-#         await message.channel.send(content="Stopped watching channel **{}**."
-#                                    .format(curguild.ac[0].name))
-#         curguild.ac[1].cancel()
-#         curguild.ac = None
-#     return True
-
-
 async def settings(message: discord.Message):
     # Updates the current guild's settings
     if not validate(message, Security.ADMIN):
@@ -267,7 +207,7 @@ async def bothelp(message: discord.Message):
 
     helpembed.add_field(name="***settime*** - {} -> {} - Admin".format(csettings.starttime, csettings.endtime), value=
     "**{}settings** settime [start time - 24hr clock] [end time - 24hr clock]\nSets the two times between which you "
-    "will be able to gather points. Set to 0 -> 0 to be always active.".format(csettings.prefix))
+    "will be able to gather points. Set to 0 -> 0 to be always active. (Timezone: UTC)".format(csettings.prefix))
 
     helpembed.add_field(name="***leaderboard*** - Anybody", value=
     "{}leaderboard\nDisplays the leaderboard. It can also be found here: <#{}>"
@@ -297,10 +237,11 @@ def generateleaderboard(guild: discord.Guild):
     cleaderboard = cguild.leaderboarddict
     sortedleaderboard = reversed(sorted([item for item in cleaderboard.items()], key=lambda n: n[1]))
     leaderboardnames = []
+
     for x in sortedleaderboard:
-        member = guild.get_member(x[0])
+        member = guild.get_member(int(x[0]))
         if member is None:
-            break
+            continue
         leaderboardnames.append([member.nick or member.name, x[1]])
 
     outputstr = "```makefile\nLEADERBOARD\n"
@@ -323,11 +264,16 @@ async def autoupdateleaderboard(guild: BotGuild):
     while True:
         print("updating {}".format(guild.object.name))
         jsonlb = json.dumps(guild.leaderboarddict)
+        print(jsonlb)
+        print("-----------")
+        print(guild.lbsavemessage.content)
 
         if jsonlb != guild.lbsavemessage.content or guild.lbdisplaymessage.content == "Initalising leaderboard. Please wait.":
             try:
+                print("L")
                 await guild.lbdisplaymessage.edit(content=generateleaderboard(guild.object))
                 await guild.lbsavemessage.edit(content=jsonlb)
+                print("W")
             except Exception as e:
                 print(f"Exception occured while updating {guild.object.name}: {e}")
         else:
