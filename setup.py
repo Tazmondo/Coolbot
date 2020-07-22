@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, time
 import discord
 
+print(discord.__version__)
+
 logging.basicConfig(level=logging.INFO)
 
 with open("botsettings.txt", "r") as file:
