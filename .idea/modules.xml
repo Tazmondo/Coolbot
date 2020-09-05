@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/MaidBot.iml" filepath="$PROJECT_DIR$/.idea/MaidBot.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../discordutils/.idea/discordutils.iml" filepath="$PROJECT_DIR$/../discordutils/.idea/discordutils.iml" />
     </modules>
   </component>
 </project>
