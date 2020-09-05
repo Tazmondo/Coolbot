@@ -252,7 +252,7 @@ def generateleaderboard(guild: discord.Guild):
     maxname = len(max(leaderboardnames, key=lambda z: len(z[0]))[0])
     for i in range(len(leaderboardnames)):
         item = leaderboardnames[i]
-        outputstr += "{a:_<{numwidth}}: {b:{width}} | {c} points\n".format(a=i + 1, b=item[0], c=item[1], width=maxname, numwidth=len(str(len(leaderboardnames))))
+        outputstr += "{a:_>{numwidth}}: {b:{width}} | {c} points\n".format(a=i + 1, b=item[0], c=item[1], width=maxname, numwidth=len(str(len(leaderboardnames))))
     return outputstr + '```'
 
 
