@@ -1,10 +1,12 @@
 import warnings
-from typing import Any, Dict, Iterable, List, Optional, Set  # noqa
+from http import HTTPStatus
+from typing import Any, Iterable, Optional, Set, Tuple
 
+from multidict import CIMultiDict
 from yarl import URL
 
+from . import hdrs
 from .typedefs import LooseHeaders, StrOrURL
-from .web_response import Response
 
 __all__ = (
     'HTTPException',
@@ -71,35 +73,86 @@ __all__ = (
 # HTTP Exceptions
 ############################################################
 
-class HTTPException(Response, Exception):
+class HTTPException(Exception):
 
     # You should set in subclasses:
     # status = 200
 
     status_code = -1
     empty_body = False
-
-    __http_exception__ = True
+    default_reason = ""  # Initialized at the end of the module
 
     def __init__(self, *,
                  headers: Optional[LooseHeaders]=None,
                  reason: Optional[str]=None,
-                 body: Any=None,
                  text: Optional[str]=None,
                  content_type: Optional[str]=None) -> None:
-        if body is not None:
-            warnings.warn(
-                "body argument is deprecated for http web exceptions",
-                DeprecationWarning)
-        Response.__init__(self, status=self.status_code,
-                          headers=headers, reason=reason,
-                          body=body, text=text, content_type=content_type)
-        Exception.__init__(self, self.reason)
-        if self.body is None and not self.empty_body:
-            self.text = "{}: {}".format(self.status, self.reason)
+        if reason is None:
+            reason = self.default_reason
+
+        if text is None:
+            if not self.empty_body:
+                text = "{}: {}".format(self.status_code, reason)
+        else:
+            if self.empty_body:
+                warnings.warn(
+                    "text argument is deprecated for HTTP status {} "
+                    "since 4.0 and scheduled for removal in 5.0 (#3462),"
+                    "the response should be provided without a body".format(
+                        self.status_code),
+                    DeprecationWarning,
+                    stacklevel=2)
+
+        if headers is not None:
+            real_headers = CIMultiDict(headers)
+        else:
+            real_headers = CIMultiDict()
+
+        if content_type is not None:
+            if not text:
+                warnings.warn("content_type without text is deprecated "
+                              "since 4.0 and scheduled for removal in 5.0 "
+                              "(#3462)",
+                              DeprecationWarning,
+                              stacklevel=2)
+            real_headers[hdrs.CONTENT_TYPE] = content_type
+        elif hdrs.CONTENT_TYPE not in real_headers and text:
+            real_headers[hdrs.CONTENT_TYPE] = 'text/plain'
+
+        self._reason = reason
+        self._text = text
+        self._headers = real_headers
+        self.args = ()
 
     def __bool__(self) -> bool:
         return True
+
+    @property
+    def status(self) -> int:
+        return self.status_code
+
+    @property
+    def reason(self) -> str:
+        return self._reason
+
+    @property
+    def text(self) -> Optional[str]:
+        return self._text
+
+    @property
+    def headers(self) -> 'CIMultiDict[str]':
+        return self._headers
+
+    def __str__(self) -> str:
+        return self.reason
+
+    def __repr__(self) -> str:
+        return "<%s: %s>" % (self.__class__.__name__, self.reason)
+
+    __reduce__ = object.__reduce__
+
+    def __getnewargs__(self) -> Tuple[Any, ...]:
+        return self.args
 
 
 class HTTPError(HTTPException):
@@ -149,39 +202,42 @@ class HTTPPartialContent(HTTPSuccessful):
 ############################################################
 
 
-class _HTTPMove(HTTPRedirection):
+class HTTPMove(HTTPRedirection):
 
     def __init__(self,
                  location: StrOrURL,
                  *,
                  headers: Optional[LooseHeaders]=None,
                  reason: Optional[str]=None,
-                 body: Any=None,
                  text: Optional[str]=None,
                  content_type: Optional[str]=None) -> None:
         if not location:
             raise ValueError("HTTP redirects need a location to redirect to.")
         super().__init__(headers=headers, reason=reason,
-                         body=body, text=text, content_type=content_type)
-        self.headers['Location'] = str(URL(location))
-        self.location = location
+                         text=text, content_type=content_type)
+        self._location = URL(location)
+        self.headers['Location'] = str(self.location)
+
+    @property
+    def location(self) -> URL:
+        return self._location
 
 
-class HTTPMultipleChoices(_HTTPMove):
+class HTTPMultipleChoices(HTTPMove):
     status_code = 300
 
 
-class HTTPMovedPermanently(_HTTPMove):
+class HTTPMovedPermanently(HTTPMove):
     status_code = 301
 
 
-class HTTPFound(_HTTPMove):
+class HTTPFound(HTTPMove):
     status_code = 302
 
 
 # This one is safe after a POST (the redirected location will be
 # retrieved with GET):
-class HTTPSeeOther(_HTTPMove):
+class HTTPSeeOther(HTTPMove):
     status_code = 303
 
 
@@ -191,16 +247,16 @@ class HTTPNotModified(HTTPRedirection):
     empty_body = True
 
 
-class HTTPUseProxy(_HTTPMove):
+class HTTPUseProxy(HTTPMove):
     # Not a move, but looks a little like one
     status_code = 305
 
 
-class HTTPTemporaryRedirect(_HTTPMove):
+class HTTPTemporaryRedirect(HTTPMove):
     status_code = 307
 
 
-class HTTPPermanentRedirect(_HTTPMove):
+class HTTPPermanentRedirect(HTTPMove):
     status_code = 308
 
 
@@ -242,15 +298,22 @@ class HTTPMethodNotAllowed(HTTPClientError):
                  *,
                  headers: Optional[LooseHeaders]=None,
                  reason: Optional[str]=None,
-                 body: Any=None,
                  text: Optional[str]=None,
                  content_type: Optional[str]=None) -> None:
         allow = ','.join(sorted(allowed_methods))
         super().__init__(headers=headers, reason=reason,
-                         body=body, text=text, content_type=content_type)
+                         text=text, content_type=content_type)
         self.headers['Allow'] = allow
-        self.allowed_methods = set(allowed_methods)  # type: Set[str]
-        self.method = method.upper()
+        self._allowed = set(allowed_methods)  # type: Set[str]
+        self._method = method
+
+    @property
+    def allowed_methods(self) -> Set[str]:
+        return self._allowed
+
+    @property
+    def method(self) -> str:
+        return self._method
 
 
 class HTTPNotAcceptable(HTTPClientError):
@@ -285,8 +348,8 @@ class HTTPRequestEntityTooLarge(HTTPClientError):
     status_code = 413
 
     def __init__(self,
-                 max_size: float,
-                 actual_size: float,
+                 max_size: int,
+                 actual_size: int,
                  **kwargs: Any) -> None:
         kwargs.setdefault(
             'text',
@@ -344,17 +407,20 @@ class HTTPUnavailableForLegalReasons(HTTPClientError):
     status_code = 451
 
     def __init__(self,
-                 link: str,
+                 link: StrOrURL,
                  *,
                  headers: Optional[LooseHeaders]=None,
                  reason: Optional[str]=None,
-                 body: Any=None,
                  text: Optional[str]=None,
                  content_type: Optional[str]=None) -> None:
         super().__init__(headers=headers, reason=reason,
-                         body=body, text=text, content_type=content_type)
-        self.headers['Link'] = '<%s>; rel="blocked-by"' % link
-        self.link = link
+                         text=text, content_type=content_type)
+        self.headers['Link'] = '<{}>; rel="blocked-by"'.format(str(link))
+        self._link = URL(link)
+
+    @property
+    def link(self) -> URL:
+        return self._link
 
 
 ############################################################
@@ -411,3 +477,18 @@ class HTTPNotExtended(HTTPServerError):
 
 class HTTPNetworkAuthenticationRequired(HTTPServerError):
     status_code = 511
+
+
+def _initialize_default_reason() -> None:
+    for obj in globals().values():
+        if isinstance(obj, type) and issubclass(obj, HTTPException):
+            if obj.status_code >= 0:
+                try:
+                    status = HTTPStatus(obj.status_code)
+                    obj.default_reason = status.phrase
+                except ValueError:
+                    pass
+
+
+_initialize_default_reason()
+del _initialize_default_reason

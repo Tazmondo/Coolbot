@@ -1,4 +1,4 @@
-__version__ = '3.6.2'
+__version__ = '4.0.0a1'
 
 from typing import Tuple  # noqa
 
@@ -72,7 +72,6 @@ from .payload import StringPayload as StringPayload
 from .payload import TextIOPayload as TextIOPayload
 from .payload import get_payload as get_payload
 from .payload import payload_type as payload_type
-from .payload_streamer import streamer as streamer
 from .resolver import AsyncResolver as AsyncResolver
 from .resolver import DefaultResolver as DefaultResolver
 from .resolver import ThreadedResolver as ThreadedResolver
@@ -187,14 +186,13 @@ __all__ = (
     'TextIOPayload',
     'get_payload',
     'payload_type',
-    # payload_streamer
-    'streamer',
     # resolver
     'AsyncResolver',
     'DefaultResolver',
     'ThreadedResolver',
     # signals
     'Signal',
+    # streams
     'DataQueue',
     'EMPTY_PAYLOAD',
     'EofStream',
