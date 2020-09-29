@@ -6,6 +6,9 @@ import discord
 
 print(discord.__version__)
 
+intents = discord.Intents().default()
+intents.members = True
+
 logging.basicConfig(level=logging.INFO)
 
 with open("botsettings.txt", "r") as file:
@@ -460,7 +463,7 @@ class MyClient(discord.Client):
         del guilds[gid]
 
 
-client = MyClient()
+client = MyClient(intents=intents)
 client.run(bottoken)
 
 client.event()
