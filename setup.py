@@ -465,5 +465,3 @@ class MyClient(discord.Client):
 
 client = MyClient(intents=intents)
 client.run(bottoken)
-
-client.event()
