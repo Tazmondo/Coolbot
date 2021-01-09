@@ -306,12 +306,24 @@ async def resetlb(message: discord.Message):
     await message.channel.send(content="Successfully reset leaderboard.")
 
 
+async def aexec(code, *args):
+
+    # Make an async function with the code and `exec` it
+    exec(
+        f'async def __ex(*args): ' +
+        ''.join(f'\n {l}' for l in code.split('\n')))
+
+    # Get `__ex` from local variables, call it and return the result
+    return await locals()['__ex'](*args)
+
+
 async def executecode(message: discord.Message):
     if not validate(message, Security.CREATOR):
         await message.channel.send(content=Security.invalid)
         return True
+
     code = message.content[9:]
-    exec(code)
+    await aexec(code, message)
     await message.channel.send(content="Code executed.")
 
 
