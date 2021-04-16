@@ -32,7 +32,7 @@ class BotSettings:
                 args.append(x[i])
             else:
                 args.append(default[i])
-        self.minforcount, self.iscounting, self.prefix, self.starttime, self.endtime, self.lbchannelid = args
+        self.minforcount, self.iscounting, self.prefix, self.starttime, self.endtime, self.lbchannelid, self.lbmsgid = args
 
 
 class BotGuild:
