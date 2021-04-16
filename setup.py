@@ -407,9 +407,7 @@ async def setupguild(guild: discord.Guild, myguild: discord.Guild):
             manage_webhooks=True,
         )
         try:
-            lbdisplay = await guild.create_text_channel('coolbot-leaderboard', topic=
-            "DO NOT SEND ANY MESSAGES TO THIS CHANNEL OR THE BOT WON'T BE ABLE TO UPDATE YOUR SERVER'S LEADERBOARD. "
-            "This channel can be renamed.",
+            lbdisplay = await guild.create_text_channel('coolbot-leaderboard', topic="This channel can be renamed.",
                                                         overwrites={
                                                             guild.default_role: permissions,
                                                             client.user: meperms
@@ -421,11 +419,10 @@ async def setupguild(guild: discord.Guild, myguild: discord.Guild):
             return True
 
         lbdisplaymsg = await lbdisplay.send(content="Initalising leaderboard. Please wait.")
+        guildsettings.lbmsgid = lbdisplaymsg.id
     else:
         lbdisplay = guild.get_channel(guildsettings.lbchannelid)
-        lbdisplaymsg = await lbdisplay.fetch_message(lbdisplay.last_message_id)
-        if lbdisplaymsg.author != guild.me:
-            lbdisplaymsg = await lbdisplay.send(content="Initalising leaderboard. Please wait.")
+        lbdisplaymsg = await lbdisplay.fetch_message(guildsettings.lbmsgid)
 
     newguild = BotGuild(guild.id, guildsettings, lbinput, lbdisplaymsg, lbsavemsg, settingsmessage,
                         guild)
