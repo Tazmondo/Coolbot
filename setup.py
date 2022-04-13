@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime, time
 import discord
+from os import environ as env
 
 print(discord.__version__)
 
@@ -11,14 +12,17 @@ intents.members = True
 
 logging.basicConfig(level=logging.INFO)
 
-with open("botsettings.txt", "r") as file:
-    botparameters = json.loads(file.read())
+try:
+    bottoken = env['token']
+    myid = int(env['myid'])
+    myserverid = int(env['myserverid'])
+    botclientid = int(env['botclientid'])
 
-bottoken = botparameters['token']
+except KeyError as e:
+    print("INVALID ENVIRONMENT VARIABLES", e)
+    raise e
+
 guilds = {}
-myid = botparameters['myid']
-myserverid = botparameters['myserverid']
-botclientid = botparameters['botclientid']
 validpermissions = discord.Permissions(201850064)
 
 
