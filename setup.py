@@ -90,7 +90,7 @@ def validate(message: discord.Message, security):
 
 
 async def ping(message: discord.Message):  # Simple test command
-    await message.channel.send(content="Pong!")
+    await message.channel.send(content=f"Pong in {client.latency*1000:.1f}ms!")
     return True
 
 
