@@ -353,6 +353,11 @@ async def nobitches(msg: discord.Message):
         return True
 
     channel: discord.abc.Messageable = msg.channel
+
+    reference = msg.reference
+    if reference:
+        reference.fail_if_not_exists = False
+
     await msg.delete()
     await channel.send("""```
 ———————————————No bitches?———————————————
@@ -370,7 +375,7 @@ async def nobitches(msg: discord.Message):
 ⠀⠀⠀⡟⡾⣿⢿⢿⢵⣽⣾⣼⣘⢸⢸⣞⡟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠁⠇⠡⠩⡫⢿⣝⡻⡮⣒⢽⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 —————————————————————————————————————————
-```""")
+```""", reference=reference, mention_author=False)
 
 
 noprefixcmds = {
